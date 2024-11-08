@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommender</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #121212;
+            color: #ffffff;
+            min-height: 100vh; /* Make body full height */
+            position: relative; /* For absolute positioning of suggestions */
+        }
+
+        .poster {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 280px;
+            height: 400px;
+            margin-bottom: 20px;
+            transform: scale(1);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .poster:hover {
+            opacity: 1;
+            transform: scale(1.02);
+        }
+        .poster:hover .MovieDetails{
+            opacity: 1;
+        }
+
+
+        select,
+        button {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+        }
+
+        button {
+            font-size: 15px;
+            border: 1px solid #ffffff0e;
+            background-color: #f5f5f511;
+            color: white;
+            transition: 0.3s ease-in-out;
+            cursor: pointer;
+        }
+
+        button:hover {
+            box-shadow: 0 0 50px #12e9b3;
+            border: 1px solid #12e9b3;
+            background-color: #12e9b3;
+        }
+
+        .recommendations {
+            flex-wrap: wrap;
+            flex: 1;
+            gap: 20px;
+            display: flex;
+            width: 100%;
+            justify-content: center;
+            height: auto;
+            box-sizing: border-box;
+        }
+
+        .MovieDetails {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: 0.3s;
+            opacity: 0;
+        }
+
+        .MovieName {
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .minicontainer {
+            gap: 20px;
+            flex-direction: column;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-width: 1300px;
+            width: 100%;
+            height: 100%;
+        }
+
+        #movieInput {
+            margin-top: 20px;
+            padding: 10px;
+            text-align: center;
+            box-sizing: border-box;
+            font-size: 15px;
+            width: 90%;
+            max-width: 1000px;
+            height: 50px;
+            color: white;
+            background-color: #ffffff17;
+            border-radius: 5px;
+            outline: none;
+            border: none;
+        }
+
+        .suggestions {
+            width: 100%;
+            max-width: 1150px;
+
+            position: absolute;
+            top: 60px; /* Adjust based on input height */
+            background-color: rgb(15, 15, 15);
+            border-radius: 5px;
+            padding: 5px;
+            z-index: 10;
+            display: none; /* Hide by default */
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .suggestion-item {
+            color: white;
+            padding: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .hidden {
+            display: none; /* Class for hiding elements */
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none; /* Hide by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 20; /* Above other content */
+        }
+
+        .loading-icon {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #12e9b3;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="minicontainer">
+        <input type="text" id="movieInput" placeholder="Search your Favorite Movie..." />
+        <div class="suggestions" id="suggestionsList"></div>
+        <form method="POST" id="movieForm">
+            <input type="hidden" name="movie_name" id="selectedMovie" />
+            <button type="submit">Show Recommendations</button>
+        </form>
+
+        {% if recommendations %}
+        <div class="recommendations">
+            {% for movie, poster in recommendations %}
+            <div class="poster">
+                <img src="{{ poster }}" alt="Poster for {{ movie }}" width="100%">
+                <div class="MovieDetails">
+                    <p class="MovieName">{{ movie }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-icon"></div>
+    </div>
+
+    <script>
+        const movies = [{% for movie in movies %}'{{ movie }}',{% endfor %}];
+        const suggestionsList = document.getElementById('suggestionsList');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        document.getElementById('movieInput').addEventListener('input', function() {
+            const input = this.value.toLowerCase();
+            suggestionsList.innerHTML = ''; // Clear previous suggestions
+
+            if (!input) {
+                suggestionsList.style.display = 'none';
+                return; // Exit if input is empty
+            }
+
+            const filteredMovies = movies.filter(movie => movie.toLowerCase().includes(input)).slice(0, 10); 
+
+            if (filteredMovies.length === 0) {
+                suggestionsList.style.display = 'none';
+            } else {
+                suggestionsList.style.display = 'flex'; // Show suggestions
+                filteredMovies.forEach(movie => {
+                    const div = document.createElement('div');
+                    div.textContent = movie;
+                    div.className = 'suggestion-item';
+                    div.onclick = () => selectMovie(movie); // Function to handle movie selection
+                    suggestionsList.appendChild(div);
+                });
+            }
+        });
+
+        function selectMovie(movie) {
+            document.getElementById('selectedMovie').value = movie; // Set hidden input value
+            document.getElementById('movieInput').value = movie; // Set input value
+            suggestionsList.style.display = 'none'; // Hide suggestions
+        }
+
+        document.getElementById('movieInput').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default form submission
+                const inputValue = this.value.trim(); // Trim whitespace from input
+                if (inputValue) { // Only submit if there is a value
+                    document.getElementById('selectedMovie').value = inputValue; // Set input value
+                    loadingOverlay.style.display = 'flex'; // Show loading overlay
+                    document.getElementById('movieForm').submit(); // Submit the form
+                }
+            }
+        });
+
+        // Show loading overlay when the recommendations are loading
+        document.getElementById('movieForm').addEventListener('submit', function() {
+            loadingOverlay.style.display = 'flex'; // Show loading overlay
+        });
+    </script>
+</body>
+
+</html>
