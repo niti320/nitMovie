@@ -66,7 +66,7 @@ else:
         cols = st.columns(3)  
         for i in range(6): 
             with cols[i % 3]:  
-                st.image(movie_poster[i], use_column_width=True, caption=f"Rating: {movie_ratings[i]}")
+                st.image(movie_poster[i], use_container_width=True, caption=f"Rating: {movie_ratings[i]}")
                 st.write(movie_name[i])  
                 st.write("")
 
